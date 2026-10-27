@@ -1,3 +1,4 @@
+https://git67-67.github.io/spectrum-lab-with-driver/
 # LED Spectrum Lab
 
 Browser tool to measure (X-Rite i1 Pro via WebUSB, or a built-in demo simulator) and analyse LED spectra: CRI, TM-30, CIE, photometry, melanopic, spectral quality, two-source comparison, groups of repeated shots, X–Y plots, LED mixer.
