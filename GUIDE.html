@@ -1,0 +1,319 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>LED Spectrum Lab guide</title><style>body{font:15px/1.55 system-ui,sans-serif;max-width:860px;margin:0 auto;padding:20px 16px;color:#222}table{border-collapse:collapse}td,th{border:1px solid #ccc;padding:3px 8px}code{background:#eee;padding:0 3px}h2{margin-top:2em;border-bottom:1px solid #ccc}</style></head><body><h1>LED Spectrum Lab: user guide</h1>
+<p>LED Spectrum Lab is two single-file web pages that share one database in your browser:</p>
+<table>
+<thead>
+<tr>
+<th>Page</th>
+<th>Job</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>measure.html</strong></td>
+<td>Connect the i1 Pro (or the demo), calibrate, take measurements, put them into groups. Shows the full analysis of what you just measured.</td>
+</tr>
+<tr>
+<td><strong>lab.html</strong></td>
+<td>Analyse, compare and plot everything that was measured. Also the LED library and mixer of the original Lab.</td>
+</tr>
+</tbody>
+</table>
+<p>Both pages show the same analysis tabs. Open both from the <strong>same folder / web address in the same browser profile</strong>: they update each other within a second or two, so you can measure on one screen and watch CRI, TM-30, spectrum and colour on the other.</p>
+<hr />
+<h2 id="quickstart">1. Quick start</h2>
+<ol>
+<li>Open <code>measure.html</code> in <strong>Chrome or Edge</strong> (WebUSB exists only in Chromium browsers). The page must be <code>https://</code>, <code>localhost</code> or a local file.</li>
+<li>Press <strong>Connect i1 Pro</strong> and choose the instrument, or press <strong>Demo</strong> (a simulator, no hardware needed).</li>
+<li>Cover the sensor (cap on, or lay the instrument on a dark surface) and press <strong>Dark calibration</strong> (about 5 s).</li>
+<li>In the <strong>Group</strong> card type a name, the LED / device name, the <strong>current (mA)</strong> and <strong>voltage (V)</strong> (and temperature if you like).</li>
+<li>Point the instrument at the LED and press <strong>● Measure</strong> (or the space bar, or the button on the instrument). Set "× N shots" first to repeat the measurement; all N shots land in the group and their mean is the group's result.</li>
+<li>Look at the tabs (Overview, Spectrum, CIE, CRI, TM-30 …). Everything is computed from the active group, live.</li>
+<li>For the next operating point press <strong>Next condition</strong>: it starts a new group with the same LED and asks for the next current.</li>
+<li>On <code>lab.html</code> (or the <strong>Measurements</strong>, <strong>Overlay</strong> and <strong>X–Y plots</strong> tabs) compare the groups: spectra on top of each other, or any quantity against any other (flux vs current, Duv vs flux, peak wavelength vs temperature …).</li>
+</ol>
+<blockquote>
+<p><strong>Back up your data.</strong> Everything lives in the browser's database. Use <em>Measurements → Export → All measurements (.json)</em> regularly.</p>
+</blockquote>
+<hr />
+<h2 id="how">2. How it works</h2>
+<h3 id="how-groups">2.1 Shot → group → analysis</h3>
+<ul>
+<li>A <strong>shot</strong> is one reading of the instrument: a spectrum from 380 to 730 nm on a 1 nm grid (spectral irradiance, mW/m²/nm), plus the 128 raw sensor pixel values and the instrument settings (integration time, frames, peak counts, calibration used, kernel used).</li>
+<li>A <strong>group</strong> collects shots that belong together, normally <strong>repeats of the same measurement</strong>, to average out noise. It also carries the <em>operating point</em>: LED name, current, voltage, power, temperature, tags, a note, and any extra fields you define.</li>
+<li><strong>A group is shown as one measurement</strong>: its spectrum is the mean of its <em>included</em> shots. You can untick a shot (outlier) to leave it out of the mean, or look at a single shot. Nothing is ever deleted unless you delete it.</li>
+<li>The standard deviation of the shots is kept and used as <strong>error bars</strong> in the X–Y plots.</li>
+<li>All analysis (CCT, Duv, CRI, TM-30, photometry, melanopic …) is done on the <strong>mean spectrum</strong> of the group by the same engine that analyses library LEDs.</li>
+</ul>
+<h3 id="how-store">2.2 Two pages, one store</h3>
+<p>Both pages use the IndexedDB database <code>led-spectrum-lab-measurements</code>. Changes are announced between tabs (BroadcastChannel, the <code>storage</code> event, and a 2 s poll as fallback). The header chip "saved in this browser" shows that the database is available. If it says <em>NOT saved</em> the browser blocks the database (private window?): export your data manually.</p>
+<h3 id="how-units">2.3 Units, flux factor G and the 380–730 nm range</h3>
+<p>The i1 Pro measures <strong>irradiance at its sensor</strong> (mW/m²/nm), not the total light of an LED.</p>
+<ul>
+<li>Without extra information the tool reports <strong>illuminance in lux</strong> (where the Lab says "lm") and <strong>irradiance in mW/m²</strong> (where it says "mW"). A banner on the overview says so.</li>
+<li>To get <strong>lumens and watts</strong> of the LED itself, set the <strong>flux factor G (m²)</strong>: total flux = irradiance × G. Choose in <em>Measurements → Flux conversion</em>: Lambertian source at distance d (G = π·d²), isotropic (4π·d²), or a custom value. A single group can override the global setting. In a goniometer or integrating sphere set G from your calibration.</li>
+<li><strong>Efficacy (lm/W)</strong> needs electrical power. If you enter current and voltage, power = I × V is used. If G is unknown the tool uses <em>illuminance per watt</em> (lx/W) instead, which is fine to compare operating points of the same LED at the same distance.</li>
+<li>The instrument covers <strong>380–730 nm</strong>. Outside that the spectrum is treated as zero. For red LEDs with a long tail, tick <strong>"extend falling red tail to 780 nm"</strong> in the Measurements tab. It continues an obviously falling tail with an exponential decay before CRI, TM-30 and lumens are computed. Deep-red and far-red LEDs beyond 730 nm cannot be measured.</li>
+</ul>
+<h3 id="how-kernel">2.4 From 128 pixels to a spectrum: the kernel</h3>
+<p>The i1 Pro has <strong>128 pixels</strong>, 3.1–3.6 nm apart; each pixel sees a band 6–10 nm wide. The spectrum you see is a weighted sum of the pixels: the weights are the <strong>kernel</strong>. Finer than the pixel spacing is interpolation, not extra information: a 5 nm LED line always looks about 10 nm wide.</p>
+<table>
+<thead>
+<tr>
+<th>Kernel / preset</th>
+<th>When to use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>LED lines: 1 nm, ArgyllCMS interpolation</strong> (default)</td>
+<td>Best for LED spectra: no extra smoothing, closest colour for narrow lines.</td>
+</tr>
+<tr>
+<td>Standard 10 nm (36 bands)</td>
+<td>Exactly the ArgyllCMS / spotread numbers.</td>
+</tr>
+<tr>
+<td>High resolution 3.33 nm</td>
+<td>ArgyllCMS <code>-H</code> grid.</td>
+</tr>
+<tr>
+<td>Fine 1 nm (factory)</td>
+<td>The 36 factory bands interpolated: widest kernel, makes narrow lines about 14 nm wide and shifts their colour (a 525 nm line: Δx +0.004, Δy −0.008). Fine for broadband light.</td>
+</tr>
+<tr>
+<td>Custom</td>
+<td>Any grid and kernel: ArgyllCMS filter, factory, windowed sinc, triangle, Gaussian; width and interpolation.</td>
+</tr>
+</tbody>
+</table>
+<p>Tested with simulated lights: every kernel preserves power within about 1 %, noise is the same, broad phosphor LEDs agree to Δx,Δy &lt; 0.0005 whatever you choose. The Instrument tab's <strong>Compare kernels</strong> button draws one of your own measurements with five kernels. The 128 raw pixel values are stored with every shot, so the original data is never lost.</p>
+<h3 id="how-cal">2.5 Calibrations</h3>
+<table>
+<thead>
+<tr>
+<th>Calibration</th>
+<th>What it does</th>
+<th>When</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Dark</strong></td>
+<td>Subtracts the sensor's dark signal (modelled from two readings, valid for any exposure).</td>
+<td>Before every session; again after 20–30 min or when the room temperature changes. Required.</td>
+</tr>
+<tr>
+<td><strong>Source (black-body) correction</strong></td>
+<td><em>Shape</em> calibration: you measure a lamp of known colour temperature (tungsten halogen about 2856 K, or your own reference CSV) and the tool derives a multiplier per band so that the instrument shows that shape. Scale-free; applies to later measurements while ON.</td>
+<td>When you want to correct a colour tilt of the instrument. Limited by how good the lamp is (100 K off the rated temperature = a colour tilt in every measurement).</td>
+</tr>
+<tr>
+<td><strong>Black-body at several temperatures</strong></td>
+<td>For a lamp whose temperature you can change but not know exactly. Capture ≥ 3 temperatures, fit; optionally enter the true temperature of one step (anchor). Can be used as source correction.</td>
+<td>Calibration without a certified lamp. The steps in 1/T are exact; the absolute values need an anchor.</td>
+</tr>
+<tr>
+<td><strong>Absolute level</strong></td>
+<td>One factor for the whole spectrum: from a luminance (cd/m²) or irradiance meter, from a laser line (power and beam area) or entered directly. <strong>Match lux meter</strong> (measure page, quick settings) does the same from an illuminance reading.</td>
+<td>When you need real lux / mW/m².</td>
+</tr>
+</tbody>
+</table>
+<p>Corrections only affect <strong>new</strong> measurements. Each shot records which correction and kernel it was taken with.</p>
+<h3 id="how-calc">2.6 What is calculated</h3>
+<p>Colorimetry on the CIE 1931 2° and 1964 10° observers (1 nm grid); CCT and Duv from the nearest point of the Planckian locus in CIE 1960 uv; CRI (CIE 13.3-1995, R1–R14); TM-30-20 (Rf, Rg, hue-bin metrics, 99 CES); photometry (photopic, scotopic); alpha-opic and melanopic quantities (CIE S 026, DER and EDI); photon flux (PPF 400–700 nm, ePAR 400–750 nm); spectral quality (SSI, band coverage, smoothness, narrowest peak). Treat the results as engineering estimates and check them against calibrated references for anything that matters.</p>
+<hr />
+<h2 id="measure">3. The measure page</h2>
+<h3 id="m-instrument">3.1 Instrument card</h3>
+<p>Connect / Demo / Disconnect, the <strong>Dark calibration</strong> button and the age of the dark calibration, small chips that show whether the <strong>source correction</strong> and <strong>absolute level</strong> are on and which <strong>kernel</strong> is used, and a shortcut to <strong>Calibration &amp; settings</strong> (the Instrument tab). The status line shows what the instrument is doing.</p>
+<h3 id="m-measure">3.2 Measure card</h3>
+<ul>
+<li><strong>● Measure × N shots</strong>: N separate shots into the active group. <strong>Stop</strong> ends a series.</li>
+<li><strong>▶ Live</strong>: continuous readings (averaging time from <em>Quick settings</em>); the analysis shows the live spectrum ("Live preview, not saved"). <strong>Save live shot</strong> keeps the current spectrum in the group.</li>
+<li><strong>Quick settings</strong>: live averaging time, <strong>Match lux meter</strong> (enter the reading of a lux meter pointed at the same light, press the button: all future measurements are scaled).</li>
+<li><strong>Demo light</strong> (demo only): choose the simulated LED and its drive current. Type the same current into the group to make plots.</li>
+<li>Exposure, averaging time, targets and everything else are set in the <strong>Instrument</strong> tab and apply to every shot.</li>
+</ul>
+<p>Shortcuts: <strong>Space</strong> measures (when no field has the focus); the <strong>button on the instrument</strong> measures too.</p>
+<h3 id="m-group">3.3 Group card</h3>
+<p>Choose the active group, <strong>+ New</strong> (empty group) or <strong>Next condition</strong> (same LED, voltage, temperature, tags; type the next current). Fill in <em>group name, LED / device, current, voltage, temperature, electrical power, flux factor G, tags, note</em> and any own fields (e.g. "supply", "heatsink"). The list shows the latest shots with include checkboxes, <strong>◎</strong> (show this shot alone) and <strong>✕</strong> (delete); <strong>Undo last shot</strong> removes the newest; <strong>Show group mean</strong> returns to the mean.</p>
+<h3 id="m-instrument-tab">3.4 The Instrument tab</h3>
+<p>The complete original i1 Pro console:</p>
+<ul>
+<li><strong>Light / Pigment</strong> mode (pigments use the instrument's own lamp and a white-tile calibration; they stay in the console).</li>
+<li><strong>Advanced settings</strong>: exposure (auto with target counts and longest time, or manual integration time), <em>Resolution and output</em> (presets, custom grid, kernel, width, interpolation; <strong>Compare kernels</strong>), <em>Live recording and averaging</em> (rolling or cumulative mean, update interval, time plots, CSV), <em>Calibrate against a known source</em>, <em>Calibrate the absolute level</em>, <em>Blackbody at several temperatures</em>, <em>Calibration data (EEPROM)</em> (export, import, back to the instrument's own), <em>Readout and display</em> (peak labels, valleys), <em>Instrument info and diagnostics</em>, Linux setup.</li>
+<li>The console has its own <strong>measurement table</strong> (tick rows to draw, rename by double-click, export CSV / .sp / ArgyllCMS values / JSON). With the option <em>"Also add every measurement made here to the active group"</em> (on by default) light measurements taken in the console also become shots of the active group. <strong>Add to active group</strong> sends ticked rows later; <strong>Analyse ▸</strong> shows one in the Lab's analysis.</li>
+</ul>
+<hr />
+<h2 id="analysis">4. The analysis tabs</h2>
+<p>All tabs analyse the <strong>Source</strong> chosen in the header (live preview, the active group, the latest shot, any group, an LED or the mix). The <strong>Illuminance (lx)</strong> field sets the level for the melanopic EDI of LED sources.</p>
+<table>
+<thead>
+<tr>
+<th>Tab</th>
+<th>Shows</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Overview</strong></td>
+<td>KPI cards (CCT, Duv, CRI, TM-30, flux, efficacy, melanopic DER, SSI …), spectrum and chromaticity.</td>
+</tr>
+<tr>
+<td><strong>Spectrum</strong></td>
+<td>The spectrum in mW/nm, µmol/s/nm or normalised, log axis, fill, overlay of V(λ), V′(λ), melanopic and cone curves; <strong>Auto labels</strong> for peaks and valleys; zoom with the wheel, pan by dragging, double-click resets.</td>
+</tr>
+<tr>
+<td><strong>CIE diagram</strong></td>
+<td>Chromaticity in xy or u′v′ (2° or 10°), the Planckian locus, point table.</td>
+</tr>
+<tr>
+<td><strong>CRI</strong></td>
+<td>R1–R14 bars and the test-colour table.</td>
+</tr>
+<tr>
+<td><strong>TM-30</strong></td>
+<td>Colour vector graphic, Rf,h, Rcs,h, Rhs,h, the 99 CES and the hue-bin table.</td>
+</tr>
+<tr>
+<td><strong>Spectral quality</strong></td>
+<td>SSI, band coverage, smoothness, peaks.</td>
+</tr>
+<tr>
+<td><strong>Photometry</strong></td>
+<td>Luminous, scotopic and radiant quantities, efficacy, band shares, photon flux.</td>
+</tr>
+<tr>
+<td><strong>Melanopic &amp; sensitivities</strong></td>
+<td>Alpha-opic irradiance, DER and EDI.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="compare">4.1 Comparing two sources</h3>
+<p>Pick the second spectrum in the header: <strong>Compare</strong>. It can be <em>none</em>, the TM-30 reference illuminant, D65, illuminant A, the mix, any LED of the library <strong>or any measured group</strong>. Then:</p>
+<ul>
+<li><strong>Every tab</strong> gets a <strong>comparison table</strong> with the measurements of both sources side by side, A (analysed source, blue) and B (compare, grey), and the difference <strong>B − A</strong>: peak wavelength(s), peak width (FWHM), centroid, dominant wavelength, purity, CCT, Duv, x y, u′ v′, CRI, R9, TM-30 Rf / Rg, flux or illuminance, LER, S/P, melanopic DER and EDI, SSI, smoothness … The Overview lists all, other tabs the relevant ones. <strong>Δu′v′</strong> is the colour distance (about 0.002 is just visible side by side, 0.004–0.006 clearly visible). Hover a row for its meaning.</li>
+<li><strong>Charts show B too</strong>: dashed grey in the spectrum, a grey point in the CIE diagram, ◆ markers over the CRI, TM-30 and band bars, a dashed blue polygon in the TM-30 colour vector graphic.</li>
+<li>D65, A and the TM-30 reference are scaled to the lumens of A so they are directly comparable in the plot; measured groups and LEDs keep their own level.</li>
+</ul>
+<p>For a bigger picture of <strong>many</strong> groups at once use <em>Overlay</em> (spectra) and <em>X–Y plots</em> (any quantity vs any other).</p>
+<h3 id="labels">4.2 Auto labels</h3>
+<p>On the <em>Spectrum</em> and <em>Overlay</em> tabs the toolbar <strong>Auto labels</strong> marks <strong>peaks ▲</strong> and <strong>valleys ▼</strong> with their wavelength (sub-nanometre, parabola through the top) and optionally the height. <strong>Max</strong> is the number per trace, <strong>prominence %</strong> how far a peak or valley must stand out from its surroundings (relative to the highest point), <strong>min. spacing nm</strong> merges close labels, <strong>smooth nm</strong> averages before searching (raise it for noisy spectra). Valleys are searched only between the outermost peaks. By default only the main trace is labelled; <strong>all traces</strong> labels every trace (can be crowded). The Instrument tab's chart has the same (number, prominence, valleys).</p>
+<hr />
+<h2 id="library">5. Measurements, Overlay and X–Y plots</h2>
+<h3 id="t-meas">5.1 Measurements tab</h3>
+<p>The list of all groups with CCT, illuminance, shot count and the operating point; tick rows to select them for the Overlay and X–Y plots. Click a row to edit it on the right.</p>
+<ul>
+<li><strong>Edit</strong> name, LED, current, voltage, power, temperature, G, tags, note, extra fields (+ field adds your own, for example "supply voltage"; it becomes a metric you can plot).</li>
+<li><strong>Shots</strong> of the group: include/exclude, move to another group (for example a mis-assigned shot), delete.</li>
+<li><strong>Make active</strong> sends new measurements to this group; <strong>Analyse ▸</strong> shows it in the analysis tabs; <strong>→ LED library</strong> adds the mean spectrum to the LED library (so it can be used in mixes; asks for the flux if G is unknown).</li>
+<li><strong>Import…</strong> / <strong>Export</strong>: JSON with everything (groups, shots, raw pixels), summary CSV of all groups, spectra CSV. <strong>Merge</strong> combines ticked groups into one (all shots are kept); <strong>Delete</strong> removes groups and their shots.</li>
+</ul>
+<h3 id="t-overlay">5.2 Overlay</h3>
+<p>Spectra of the ticked groups on top of each other, plus their chromaticity. <strong>Scale</strong>: absolute, normalised to peak, equal illuminance (100 lx) or equal power, to compare shape or level. <strong>Individual shots</strong> shows the shots behind each mean. Use it to see how peak wavelength and shape change with current or temperature.</p>
+<h3 id="t-xy">5.3 X–Y plots</h3>
+<p>Any quantity against any other, one point per group (the mean of its shots).</p>
+<ul>
+<li><strong>Quick plots</strong>: flux vs current, efficacy vs current, Duv vs flux, CCT vs current, CRI vs current, peak λ vs current / temperature, flux vs temperature …</li>
+<li><strong>X / Y / Y2</strong>: any metric: set-up fields (current, voltage, power, temperature, your own fields), light output, efficacy, colour (CCT, Duv, x, y, u′, v′, dominant λ), spectrum (peak λ, FWHM), CRI R1–R14, TM-30, circadian. Y2 adds a right-hand axis.</li>
+<li><strong>Curves per</strong> LED / first tag / one curve. <strong>Normalise Y</strong> to the maximum or to the first point (for example droop curves). Lines, markers, <strong>error bars</strong> (±1σ of the shots), group names, log axes, Y from 0.</li>
+<li>Click a point to select its group in the Measurements tab. <strong>PNG</strong> and <strong>CSV</strong> export the plot and its data.</li>
+<li>Needs the relevant fields: efficacy needs current and voltage (or power); lumens need G. The message above the plot says what is missing.</li>
+</ul>
+<hr />
+<h2 id="lab">6. The LED library and the mixer</h2>
+<p>The original Lab on <code>lab.html</code>: a library of LEDs (the built-in ones are <strong>synthetic</strong>, replace them with measured spectra), create one with <strong>+ New LED</strong> (peak wavelength and width, or a CCT for a white pc-LED, or import a CSV), add LEDs to the <strong>mix</strong> with ＋ and set quantity, drive current and scale per channel; the mix is analysed like any source. <em>Export</em> writes library, mix or LED as <code>.json</code>; spectra can be imported as CSV (wavelength, intensity). Flux is assumed linear in current with no thermal shift.</p>
+<hr />
+<h2 id="files">7. Files and backup</h2>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Content</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Measurements JSON</td>
+<td>groups, shots, raw pixels, settings; re-importable (Import…).</td>
+</tr>
+<tr>
+<td>Summary CSV</td>
+<td>one row per group with all metrics.</td>
+</tr>
+<tr>
+<td>Spectra CSV</td>
+<td>the mean spectra of the groups.</td>
+</tr>
+<tr>
+<td>Console exports</td>
+<td>CSV (chosen resolution), <code>.sp</code> (ArgyllCMS), ArgyllCMS values (36 bands, 3.33 nm), pixels CSV, JSON of the console table, EEPROM <code>.bin</code> / hex.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="trouble">8. Troubleshooting</h2>
+<table>
+<thead>
+<tr>
+<th>Problem</th>
+<th>What to do</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>"No WebUSB"</td>
+<td>Use Chrome or Edge on desktop.</td>
+</tr>
+<tr>
+<td>"Access denied / unable to claim"</td>
+<td>Close ArgyllCMS / spotread or another tab; Linux: install the udev rule (<code>udev/55-i1pro.rules</code>) and re-plug; Windows: bind WinUSB (for example with Zadig).</td>
+</tr>
+<tr>
+<td>Timeout</td>
+<td>The driver resets and retries once. Use a short cable, no hub. <em>Instrument tab → Advanced → Instrument info → Copy diagnostic log</em>.</td>
+</tr>
+<tr>
+<td>"Saturated"</td>
+<td>Move away from the light, shorten a manual integration time, lower the auto target.</td>
+</tr>
+<tr>
+<td>"Frames varied" / flicker</td>
+<td>PWM-dimmed light: use a longer averaging time or several shots.</td>
+</tr>
+<tr>
+<td>Weak signal</td>
+<td>Move closer, longer <em>Longest auto time</em>.</td>
+</tr>
+<tr>
+<td>Lab page does not update</td>
+<td>Open both pages from the same address (same folder) in the same browser profile; "saved in this browser" must show in the header.</td>
+</tr>
+<tr>
+<td>Numbers in lx / mW/m² instead of lm / mW</td>
+<td>Set the flux factor G (see 2.3).</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="limits">9. Limits</h2>
+<ul>
+<li>The i1 Pro Rev A–D is supported (not i1Pro 2 / Rev E). Reflective mode, live mode, the instrument button and the absolute scale have so far only been tested against the simulator.</li>
+<li>The instrument covers 380–730 nm; optical resolution is about 6.5 nm; widths of narrow lines are broader than real.</li>
+<li>The absolute scale of the factory calibration is assumed (mW/m²/nm), not verified. Calibrate against a reference for real numbers.</li>
+<li>Source correction cannot be better than the lamp. A tilt of the instrument's colour response cannot be told apart from a shift of all temperatures without an anchor temperature.</li>
+<li>Flux is irradiance × G: geometry (distance, angle, diffuser) must be the same as at calibration.</li>
+</ul>
+<hr />
+<h2 id="glossary">10. Glossary</h2>
+<ul>
+<li><strong>CCT</strong>: correlated colour temperature, the temperature of the black body that looks most like the light (meaningful only near the locus).</li>
+<li><strong>Duv</strong>: distance from the Planckian locus; + greenish, − pinkish.</li>
+<li><strong>CRI Ra / R9</strong>: colour rendering index (mean of 8 samples / saturated red). Unreliable for narrow-band LEDs.</li>
+<li><strong>TM-30 Rf / Rg</strong>: fidelity and gamut indices; <strong>Rcs,h1</strong> the red chroma shift.</li>
+<li><strong>LER</strong>: lumens per watt of radiated power. <strong>WPE</strong>: radiant power / electrical power.</li>
+<li><strong>Melanopic DER / EDI</strong>: melanopic efficacy relative to D65 / the equivalent D65 illuminance.</li>
+<li><strong>FWHM</strong>: full width at half maximum of a peak.</li>
+<li><strong>Δu′v′</strong>: colour difference in the CIE 1976 diagram.</li>
+<li><strong>Shot</strong>: one reading. <strong>Group</strong>: shots of one condition, shown as their mean.</li>
+</ul></body></html>

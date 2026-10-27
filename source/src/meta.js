@@ -1,0 +1,1 @@
+window.LSL_META={"repo": "https://github.com/YOUR-USER/led-spectrum-lab", "version": "1.0.0", "license": "AGPL-3.0-or-later"};

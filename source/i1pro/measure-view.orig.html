@@ -1,0 +1,251 @@
+<style id="ms-css">
+#view-meas .chip{display:inline-block;padding:1px 8px;border-radius:999px;border:1px solid var(--line);font-size:11.5px;color:var(--muted);white-space:nowrap}
+#view-meas .chip.ok{color:var(--accent);border-color:var(--accent)}
+#view-meas .chip.warn{color:var(--warn);border-color:var(--warn)}
+#view-meas .steps{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+#view-meas .steps .st{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+#view-meas .btn.big{padding:10px 16px;font-size:15px}
+#view-meas .corrbar{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-top:12px;padding:8px 10px;border:1px solid var(--line);border-radius:6px}
+#view-meas .corrbar.on{border-color:var(--accent)}
+#view-meas .sum{margin-top:10px;font-size:12.5px;color:var(--muted)}
+#view-meas .linkbtn{background:none;border:0;padding:0;color:var(--accent);text-decoration:underline;cursor:pointer;font:inherit}
+#view-meas .tablewrap{max-height:420px;overflow:auto;margin-top:8px;border:1px solid var(--line);border-radius:6px}
+#view-meas table.mt{width:100%;border-collapse:collapse;font-size:12.5px}
+#view-meas table.mt th{position:sticky;top:0;background:var(--panel);text-align:left;font-weight:600;color:var(--muted);padding:6px 6px;border-bottom:1px solid var(--line);font-size:11.5px;text-transform:uppercase;letter-spacing:.04em}
+#view-meas table.mt td{padding:6px;border-bottom:1px solid var(--line);vertical-align:top}
+#view-meas table.mt tr.rw{cursor:pointer}
+#view-meas table.mt tr.rw:hover{background:var(--hover)}
+#view-meas table.mt tr.sel{background:var(--hover);box-shadow:inset 3px 0 0 var(--accent)}
+#view-meas table.mt .nm{font-weight:600;display:flex;gap:6px;align-items:center;min-width:0}
+#view-meas table.mt .nm span.t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:150px}
+#view-meas table.mt .sub2{color:var(--muted);font-size:11.5px;margin-top:2px}
+#view-meas table.mt td.n{font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+#view-meas .dot{width:10px;height:10px;border-radius:50%;flex:none;display:inline-block}
+#view-meas .sw{width:14px;height:14px;border-radius:3px;border:1px solid var(--line);flex:none;display:inline-block}
+#view-meas .legend{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--muted);margin-top:6px}
+#view-meas .legend span{display:inline-flex;gap:5px;align-items:center}
+#view-meas .advhead{display:flex;align-items:center;justify-content:space-between;gap:8px}
+#view-meas details.sub{border-top:1px solid var(--line);padding-top:8px;margin-top:10px}
+#view-meas input[type=text],#view-meas input[type=number],#view-meas select{background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:5px 7px;min-width:0;max-width:100%}
+#view-meas .nameedit{width:100%;font:inherit;font-weight:600}
+</style>
+<div id="view-meas" hidden>
+<div class="lab">
+  <p class="intro">Measure lights and pigments with an i1 Pro straight from the browser. Connect, calibrate the dark reference, press <b>Measure</b>. Every measurement lands in the table, where you can compare it, rename it, export it, or send it to the Illuminant library (lights) or to Artist pigments.</p>
+  <p class="note" id="i1p-env"></p>
+  <div class="grid">
+    <section class="stage">
+      <div class="panel" id="ms-chartcard">
+        <div class="toolbar">
+          <h2 id="ms-title" style="margin:0">Spectrum</h2>
+          <div class="toolrow">
+            <label class="chk"><input type="checkbox" id="ms-norm"> Normalise peak to 1</label>
+            <label class="chk"><input type="checkbox" id="i1p-log10"> Log axis</label>
+          </div>
+        </div>
+        <canvas id="i1p-cv" aria-label="Measured spectra" style="width:100%;height:260px;margin-top:8px"></canvas>
+        <div class="row" style="margin-top:2px"><button class="btn sm" data-z="S+" aria-label="Zoom in">＋</button><button class="btn sm" data-z="S-" aria-label="Zoom out">−</button><button class="btn sm" data-z="S0">Reset zoom</button><span class="note" style="margin:0">Hover to read values · drag to zoom a range · double-click resets · Ctrl+wheel zooms · Shift+drag pans</span></div>
+        <div class="legend" id="ms-legend"></div>
+      </div>
+      <div class="panel detail" id="ms-detail"></div>
+      <div class="panel" id="i1p-timecard" hidden>
+        <div class="toolbar"><h2 style="margin:0">Over time</h2>
+          <div class="toolrow"><label class="chk">Plot A <select id="i1p-ma"></select></label><label class="chk">Plot B <select id="i1p-mb"></select></label></div></div>
+        <canvas id="i1p-cvT" aria-label="Metrics over time" style="width:100%;height:200px;margin-top:8px"></canvas>
+        <div class="row"><button class="btn sm" data-z="T+">＋</button><button class="btn sm" data-z="T-">−</button><button class="btn sm" data-z="T0">Reset zoom</button><button class="btn sm" id="i1p-logcsv" disabled>History CSV</button><button class="btn sm" id="i1p-histclear">Clear history</button></div>
+        <div class="note" id="i1p-log" style="max-height:120px;overflow:auto;font-family:var(--mono);font-size:12px;white-space:pre;margin-top:6px"></div>
+      </div>
+      <details class="panel sub" id="ms-pixels"><summary>Sensor pixels of the selected measurement</summary>
+        <canvas id="i1p-cv2" aria-label="Raw sensor pixels" style="width:100%;height:140px;margin-top:8px"></canvas></details>
+    </section>
+
+    <aside class="side">
+      <div class="side" id="ms-main">
+        <section class="panel" id="i1p">
+          <h2>Instrument</h2>
+          <div class="row"><button class="btn primary" id="i1p-connect">Connect i1 Pro</button><button class="btn" id="i1p-demo">Try the demo (no hardware)</button><button class="btn" id="i1p-disc" hidden>Disconnect</button></div>
+          <div class="status" id="i1p-status" role="status"></div>
+          <div id="i1p-ctl" hidden>
+            <div class="seg" role="group" aria-label="What to measure" style="margin-top:10px"><button id="i1p-m-em" aria-pressed="true">Light</button><button id="i1p-m-rf" aria-pressed="false">Pigment</button></div>
+            <div class="steps">
+              <div class="st"><button class="btn" id="i1p-dark">1 · Dark calibration</button><span class="chip" id="i1p-darkst">not done</span></div>
+              <div class="st" id="i1p-whiterow" hidden><button class="btn" id="i1p-white">2 · White tile calibration</button><span class="chip" id="i1p-whitest">not done</span></div>
+              <div class="st"><button class="btn primary big" id="i1p-meas">Measure</button><button class="btn" id="i1p-stop" hidden>Stop</button></div>
+            </div>
+            <p class="note" id="i1p-help"></p>
+            <div class="field"><label for="i1p-name">Name <input type="text" id="i1p-name" placeholder="automatic (time)"></label></div>
+            <div class="corrbar" id="i1p-corrbar">
+              <label class="chk" style="color:var(--fg)"><input type="checkbox" id="i1p-ron" disabled> Source (blackbody) correction</label>
+              <span class="chip" id="i1p-rchip">none</span>
+            </div>
+            <div class="corrbar" id="i1p-abar" style="margin-top:6px">
+              <label class="chk" style="color:var(--fg)"><input type="checkbox" id="i1p-aon" disabled> Absolute level calibration</label>
+              <span class="chip" id="i1p-achip">none</span>
+            </div>
+            <div class="sum" id="i1p-sum"></div>
+            <div class="row" style="margin-top:8px"><button class="btn sm" id="ms-adv-open">Advanced settings…</button></div>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="toolbar"><h2 style="margin:0">Measurements <span id="ms-count" style="font-weight:400"></span></h2></div>
+          <div class="tablewrap" id="ms-wrap"><table class="mt" id="ms-table"><thead><tr><th><input type="checkbox" id="ms-all" aria-label="Show all"></th><th>Name</th><th style="text-align:right">CCT</th><th style="text-align:right">Y</th><th style="text-align:right">Ra</th></tr></thead><tbody></tbody></table></div>
+          <p class="note" id="ms-empty">Nothing measured yet. Connect the instrument (or try the demo), calibrate the dark reference, and press Measure.</p>
+          <p class="note" style="margin-top:6px">Tick rows to show them in the chart; click a row for its details. Buttons below act on the ticked rows.</p>
+          <div class="row">
+            <button class="btn sm" id="ms-tolib">Add to library</button>
+            <select id="ms-export" aria-label="Export"><option value="">Export…</option><option value="csv">Spectra, CSV (chosen resolution)</option><option value="argyll">ArgyllCMS values, CSV (10 nm and 3.33 nm)</option><option value="sp">.sp files (ArgyllCMS format)</option><option value="json">Everything, JSON backup</option></select>
+            <button class="btn sm" id="ms-del">Delete</button><button class="btn sm" id="ms-clear">Clear all</button>
+          </div>
+          <div class="row" style="margin-top:6px"><button class="btn sm" id="ms-load">Load a backup…</button><input type="file" id="ms-loadfile" accept=".json" hidden></div>
+          <div class="status" id="ms-msg" role="status"></div>
+        </section>
+      </div>
+
+      <div class="side" id="ms-adv" hidden>
+        <section class="panel">
+          <div class="advhead"><h2 style="margin:0">Advanced settings</h2><button class="btn sm" id="ms-adv-back">← Back to measuring</button></div>
+          <p class="note">Everything here is optional. The defaults give you the same numbers as <code>spotread</code>.</p>
+
+          <details class="sub" id="i1p-d-exp" open><summary>Exposure</summary>
+            <div class="field"><label for="i1p-exm">Exposure mode</label>
+              <select id="i1p-exm"><option value="auto">Auto (aim for a target signal)</option><option value="manual">Manual integration time</option></select></div>
+            <div id="i1p-ex-auto">
+              <div class="fgrid">
+                <label>Target peak signal (CCD counts) <input type="number" id="i1p-tgt" value="40500" min="3000" max="54000" step="500"></label>
+                <label>Longest auto time (s) <input type="number" id="i1p-maxauto" value="2" min="0.05" max="4.4" step="0.1"></label>
+              </div>
+              <label class="chk" style="margin-top:8px"><input type="checkbox" id="i1p-reuse" checked> Reuse the exposure for repeat measurements</label>
+              <p class="note" id="i1p-tgtnote"></p>
+            </div>
+            <div id="i1p-ex-man" hidden>
+              <div class="fgrid"><label>Integration time (ms) <input type="number" id="i1p-mt" value="50" min="4.7" max="4456" step="1"></label></div>
+              <p class="note" id="i1p-mtnote"></p>
+            </div>
+            <div class="field"><label for="i1p-rt">Averaging time inside one reading (s) <input type="number" id="i1p-rt" value="1" min="0.05" max="10" step="0.05"></label></div>
+          </details>
+
+          <details class="sub" id="i1p-d-res" open><summary>Resolution and output</summary>
+            <div class="field"><label for="i1p-res">Spectral resolution</label><select id="i1p-res"></select></div>
+            <div id="i1p-custom" hidden>
+              <div class="fgrid">
+                <label>From nm <input type="number" id="i1p-lo" value="380" step="1"></label>
+                <label>to nm <input type="number" id="i1p-hi" value="730" step="1"></label>
+                <label>Step nm <input type="number" id="i1p-step" value="1" min="0.1" step="0.5"></label>
+                <label>Kernel <select id="i1p-kern"><option value="argyll">ArgyllCMS (cubic interpolation + triangle)</option><option value="factory">Factory (asymmetric Hann sinc)</option><option value="sinc">Windowed sinc</option><option value="triangle">Triangle</option><option value="gaussian">Gaussian</option></select></label>
+                <label id="i1p-wscale-f">Width × <input type="number" id="i1p-wscale" value="1" min="0.3" max="2" step="0.05"></label>
+                <label id="i1p-fwhm-f" hidden><span id="i1p-fwhm-l">FWHM nm (0 = factory)</span> <input type="number" id="i1p-fwhm" value="0" min="0" step="0.5"></label>
+                <label>Parameters between bands <select id="i1p-interp"><option value="lagrange">Cubic (Lagrange)</option><option value="linear">Linear</option></select></label>
+              </div>
+            </div>
+            <p class="note" id="i1p-resnote"></p>
+            <p class="note"><b>The original ArgyllCMS values are always kept.</b> Every measurement stores the 10 nm bands and the 3.33 nm high-resolution values computed from the same pixels (the factory 36-band output and the ArgyllCMS high-resolution grid), plus the 128 raw pixel values, whatever resolution or kernel you display or export. The 128 pixels are not on an even wavelength grid and each one responds to a range of wavelengths; the raw pixels are the only true measured data.</p>
+          </details>
+
+          <details class="sub" id="i1p-d-live"><summary>Live recording and averaging</summary>
+            <div class="row" style="margin-top:6px"><button class="btn primary" id="i1p-live">▶ Start live recording</button><span class="note" id="i1p-livenote" style="margin:0"></span></div>
+            <div class="fgrid">
+              <label>Reading time per update (s) <input type="number" id="i1p-lrt" value="0.2" min="0.02" max="5" step="0.05"></label>
+              <label>Averaging <select id="i1p-am"><option value="none">None (each reading)</option><option value="roll" selected>Rolling mean</option><option value="cum">Cumulative mean</option></select></label>
+              <label id="i1p-wn-f">Rolling window (readings) <input type="number" id="i1p-wn" value="5" min="2" max="200" step="1"></label>
+              <label>Keep last (points) <input type="number" id="i1p-keep" value="600" min="20" max="5000" step="20"></label>
+            </div>
+            <label class="chk" style="margin-top:8px"><input type="checkbox" id="i1p-livesnap" checked> Add the averaged spectrum to the table when I stop</label>
+            <div class="row" style="margin-top:6px"><button class="btn sm" id="i1p-avgreset">Restart averaging</button><button class="btn sm" id="i1p-snap" disabled>Add current to table</button></div>
+            <p class="note">Live keeps measuring with the exposure it found, shows every update and the running average, and plots brightness, CCT, Duv, CRI, TM-30 … over time (card on the left). A short reading time updates faster but is noisier; the rolling mean brings the noise back down.</p>
+            <hr>
+            <p class="note"><b>Fixed number of readings</b> for the Measure button (1 = a single reading; the mean goes into the table).</p>
+            <div class="fgrid">
+              <label>Number of readings (0 = until Stop) <input type="number" id="i1p-n" value="1" min="0" max="500" step="1"></label>
+              <label>Interval (s, start to start) <input type="number" id="i1p-int" value="0" min="0" step="0.5"></label>
+            </div>
+            <label class="chk" style="margin-top:8px"><input type="checkbox" id="i1p-each"> Also keep every single reading as its own row</label>
+          </details>
+
+          <details class="sub" id="i1p-d-src"><summary>Calibrate against a known source (blackbody)</summary>
+            <p class="note">Measure a lamp whose spectrum you know (a tungsten halogen or incandescent lamp at a known colour temperature). The page derives a per-band multiplier so the instrument shows that source's shape, and applies it to every following light measurement while the switch "Source (blackbody) correction" is on. It does not change the absolute level.</p>
+            <div class="fgrid">
+              <label>Reference <select id="i1p-rk"><option value="blackbody">Ideal blackbody</option><option value="tungsten">Tungsten filament (approximate)</option><option value="custom">Custom CSV (wavelength,value)</option></select></label>
+              <label>Temperature (K) <input type="number" id="i1p-rT" value="2856" min="1500" max="10000" step="10"></label>
+            </div>
+            <div class="row" style="margin-top:8px"><input type="file" id="i1p-rfile" accept=".csv,.txt" hidden><button class="btn sm" id="i1p-rload" hidden>Load reference CSV…</button>
+              <button class="btn sm" id="i1p-rcal">Measure and calibrate</button><button class="btn sm" id="i1p-rclr" disabled>Clear</button>
+              <button class="btn sm" id="i1p-rsave" disabled>Save profile</button><button class="btn sm" id="i1p-rload2">Load profile</button><input type="file" id="i1p-rpf" accept=".json" hidden></div>
+            <canvas id="i1p-cv4" aria-label="Correction" style="width:100%;height:80px;margin-top:8px"></canvas>
+            <div class="note" id="i1p-rinfo"></div>
+          </details>
+
+          <details class="sub" id="i1p-d-abs"><summary>Calibrate the absolute level (brightness / power)</summary>
+            <p class="note">The factory scale is assumed to be mW/m²/nm and has not been checked against a reference. Here you can scale every
+              following light measurement so that a source of known level reads correctly. This is one factor for the whole spectrum
+              (the spectral <i>shape</i> is handled by the blackbody correction above). Measure the reference with the same exposure
+              settings and geometry you will use later.</p>
+            <div class="fgrid">
+              <label>Reference <select id="i1p-ak"><option value="lum">Known brightness (cd/m²), e.g. a display checked with a luminance meter</option><option value="irr">Known radiant power per area (mW/m², 380-780 nm)</option><option value="laser">Laser line of known power</option><option value="man">Enter the factor directly</option></select></label>
+              <label id="i1p-av-f">Known value <input type="number" id="i1p-av" value="100" min="0" step="any"></label>
+              <label id="i1p-al-f" hidden>Laser power (mW) <input type="number" id="i1p-ap" value="1" min="0" step="any"></label>
+              <label id="i1p-aw-f" hidden>Laser wavelength (nm, 0 = strongest peak) <input type="number" id="i1p-aw" value="0" min="0" max="800" step="0.1"></label>
+              <label id="i1p-ah-f" hidden>Integrate ± nm around it <input type="number" id="i1p-ah" value="15" min="3" max="100" step="1"></label>
+              <label id="i1p-aa-f" hidden>Beam area on the sensor (mm², blank = unknown) <input type="number" id="i1p-aa" value="" min="0" step="any"></label>
+              <label id="i1p-am2-f" hidden>Factor <input type="number" id="i1p-am2" value="1" min="0" step="any"></label>
+            </div>
+            <p class="note" id="i1p-anote"></p>
+            <div class="row" style="margin-top:8px"><button class="btn sm" id="i1p-acal">Measure and calibrate</button><button class="btn sm" id="i1p-aclr" disabled>Clear</button></div>
+            <div class="note" id="i1p-ainfo"></div>
+          </details>
+
+          <details class="sub" id="i1p-d-bb"><summary>Blackbody at several temperatures (find the true temperature)</summary>
+            <p class="note">Use a lamp whose temperature you can change (supply voltage or current) and whose true temperature you do not know exactly.
+              Set a temperature, press <b>Add this temperature</b>, change the lamp, repeat (at least 3 steps, as far apart as you can).
+              Steps in temperature are determined from the data alone, whatever the instrument's colour response or the filament's
+              emissivity. The <b>absolute</b> temperature needs one more fact: the true temperature of one step (pyrometer, or the filament
+              resistance of a tungsten lamp). Without it the factory colour calibration and a grey emitter are trusted.</p>
+            <div class="row"><label>Your estimate (K, optional) <input type="number" id="i1p-bt" value="" min="1000" max="10000" step="10" style="width:90px"></label>
+              <button class="btn sm" id="i1p-badd">Add this temperature</button><button class="btn sm" id="i1p-bclr" disabled>Clear list</button></div>
+            <div class="tablewrap" style="max-height:200px"><table class="mt" id="i1p-btab"><thead><tr><th>#</th><th>Estimate</th><th>Peak counts</th><th>Fitted T</th><th>Anchor</th></tr></thead><tbody></tbody></table></div>
+            <div class="fgrid" style="margin-top:8px">
+              <label>Anchor: known true temperature of the selected step (K, blank = none) <input type="number" id="i1p-ban" value="" min="1000" max="10000" step="1"></label>
+              <label>Selected step <select id="i1p-bas"></select></label>
+              <label>Fit range from (nm) <input type="number" id="i1p-blo" value="430" min="380" max="700" step="10"></label>
+              <label>to (nm) <input type="number" id="i1p-bhi" value="710" min="420" max="730" step="10"></label>
+            </div>
+            <div class="row" style="margin-top:8px"><button class="btn sm" id="i1p-bfit" disabled>Fit temperatures</button><button class="btn sm" id="i1p-buse" disabled>Use as source correction</button></div>
+            <div class="note" id="i1p-binfo"></div>
+          </details>
+
+          <details class="sub" id="i1p-d-ee"><summary>Calibration data (EEPROM)</summary>
+            <p class="note">The factory calibration lives in the instrument's EEPROM and is read from it when you connect. Back it up, or load another one (a .bin, a hex dump, or the "-D9" output of spotread). A loaded file replaces the wavelength matrix, linearisation and white tile data used here; the dark and white calibrations must then be redone. Nothing is written to the instrument.</p>
+            <div class="row"><button class="btn sm" id="i1p-eebin">Backup .bin</button><button class="btn sm" id="i1p-eehex">Backup hex</button>
+              <button class="btn sm" id="i1p-eeload">Import…</button><input type="file" id="i1p-eefile" hidden>
+              <button class="btn sm" id="i1p-eereset" disabled>Back to the instrument's own</button></div>
+            <div class="note" id="i1p-eeinfo"></div>
+          </details>
+
+          <details class="sub" id="i1p-d-disp"><summary>Readout and display</summary>
+            <div class="fgrid">
+              <label>Peak labels (max) <input type="number" id="i1p-pkn" value="6" min="0" max="12" step="1"></label>
+              <label>Peak prominence (% of max) <input type="number" id="i1p-pkp" value="8" min="1" max="60" step="1"></label>
+            </div>
+            <label class="chk" style="margin-top:8px"><input type="checkbox" id="i1p-inst"> In live mode also draw the latest single reading</label>
+            <label class="chk"><input type="checkbox" id="i1p-btn" checked> The instrument's button also measures</label>
+            <label class="chk"><input type="checkbox" id="i1p-auto"> Also add every measurement to the library automatically</label>
+            <p class="note">Brightness and power are computed from the factory-calibrated spectrum, which the instrument reports in mW/m²/nm. Luminance = 683 lm/W × the Y-weighted integral, so it is in cd/m² for a light that fills the instrument's view and lux behind a diffuser. The calibration factor lets you match a trusted meter: set it to (their value) ÷ (value shown here). Not yet checked against a reference meter for every unit. The calibration factor applies to measurements from now on.</p>
+          </details>
+
+          <details class="sub" id="i1p-d-info"><summary>Instrument info and diagnostics</summary>
+            <div class="readout" id="i1p-info" style="grid-template-columns:repeat(2,minmax(0,1fr))"></div>
+            <label class="chk" style="margin-top:8px"><input type="checkbox" id="i1p-autorec" checked> Reset and retry once automatically after a timeout</label>
+            <div class="row" style="margin-top:6px"><button class="btn sm" id="i1p-diag">Copy diagnostic log</button><button class="btn sm" id="i1p-diagsave">Save log</button></div>
+            <p class="note">If you see "Instrument did not answer (timeout)": the page resets the instrument and retries once by itself. If it keeps happening, plug the i1 Pro directly into the computer (not a hub), close other programs that use it, keep this tab in the foreground, and send the diagnostic log with your report.</p>
+            <div class="note" id="i1p-diagmsg"></div>
+          </details>
+        </section>
+        <section class="panel"><details class="sub" style="border:0;margin:0;padding:0"><summary>Linux setup</summary>
+          <p class="note">One-time udev rule so the browser may open the instrument (run as root, then re-plug it):</p>
+          <textarea readonly rows="3" style="width:100%;font-family:var(--mono);font-size:12px" aria-label="udev rule">SUBSYSTEM=="usb", ATTR{idVendor}=="0971", ATTR{idProduct}=="2000", MODE="0660", TAG+="uaccess"</textarea>
+          <p class="note">Save as /etc/udev/rules.d/55-i1pro.rules, then <code>sudo udevadm control --reload &amp;&amp; sudo udevadm trigger</code>. Close spotread before connecting; the page must be opened over https:// (or as a local file) in Chrome or Edge.</p>
+        </details></section>
+      </div>
+    </aside>
+  </div>
+</div>
+</div>
